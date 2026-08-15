@@ -97,7 +97,7 @@ reference simulator and `b = 0` is the most degraded configuration sampled.
 
 ## 4. Results
 
-![The fidelity cliff](figures/fig1_fidelity_cliff.png)
+![The fidelity cliff](../figures/fig1_fidelity_cliff.png)
 
 Every axis starts at 100% reliability and degrades monotonically. The summary:
 
@@ -111,7 +111,7 @@ Every axis starts at 100% reliability and degrades monotonically. The summary:
 
 ### 4.1 The amplitude–phase law: noise is graceful, delay is critical
 
-![Budget stretch](figures/fig3_budget_stretch.png)
+![Budget stretch](../figures/fig3_budget_stretch.png)
 
 The two knobs on the same observation channel behave completely differently.
 Sensor noise is the *only* graceful axis: reliability erodes continuously from
@@ -146,7 +146,7 @@ control-period cliff sits at `dt ≈ 0.15 s` — an actuator bandwidth of ~6.5 H
 below which the critically-damped actuator cannot track the PD commands fast
 enough to finish the push; failures are again timeout.
 
-![Failure modes](figures/fig2_failure_modes.png)
+![Failure modes](../figures/fig2_failure_modes.png)
 
 ### 4.3 The mechanism law: failure modes name the broken knob
 

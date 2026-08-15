@@ -99,7 +99,7 @@ deterministic seeds per cell (25,200 episodes, minutes on a laptop). Each grid
 point is normalised to a <strong>fidelity budget</strong> <code>b ∈ [0, 1]</code>, where <code>b = 1</code> is the
 reference simulator and <code>b = 0</code> is the most degraded configuration sampled.</p>
 <h2>4. Results</h2>
-<p><img alt="The fidelity cliff" src="figures/fig1_fidelity_cliff.png" /></p>
+<p><img alt="The fidelity cliff" src="../figures/fig1_fidelity_cliff.png" /></p>
 <p>Every axis starts at 100% reliability and degrades monotonically. The summary:</p>
 <table>
 <thead>
@@ -162,7 +162,7 @@ reference simulator and <code>b = 0</code> is the most degraded configuration sa
 </tbody>
 </table>
 <h3>4.1 The amplitude–phase law: noise is graceful, delay is critical</h3>
-<p><img alt="Budget stretch" src="figures/fig3_budget_stretch.png" /></p>
+<p><img alt="Budget stretch" src="../figures/fig3_budget_stretch.png" /></p>
 <p>The two knobs on the same observation channel behave completely differently.
 Sensor noise is the <em>only</em> graceful axis: reliability erodes continuously from
 100% at <code>noise = 0</code> to ~70% at 0.16 m, crosses 50% at <code>noise ≈ 0.18 m</code> — the
@@ -190,7 +190,7 @@ half the push speed, the push crawls, and every episode ends in timeout. The
 control-period cliff sits at <code>dt ≈ 0.15 s</code> — an actuator bandwidth of ~6.5 Hz,
 below which the critically-damped actuator cannot track the PD commands fast
 enough to finish the push; failures are again timeout.</p>
-<p><img alt="Failure modes" src="figures/fig2_failure_modes.png" /></p>
+<p><img alt="Failure modes" src="../figures/fig2_failure_modes.png" /></p>
 <h3>4.3 The mechanism law: failure modes name the broken knob</h3>
 <p>The failure-mode decomposition (success / timeout / escape at every grid point)
 makes the mechanism legible. Escape is caused by friction and, at the noise cliff,
