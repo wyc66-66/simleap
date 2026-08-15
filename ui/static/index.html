@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimLeap · Fidelity Budgets and Transfer Reliability</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<style>
+  :root {
+    --bg:#eef3f7; --card:#fff; --ink:#10222e; --mut:#5b7282; --line:#d5e0e9;
+    --accent:#0e5a8a; --accent2:#b03a2e; --safe:#e8f4ec; --warn:#eaf2fb;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: "Segoe UI", system-ui, sans-serif; background: var(--bg); color: var(--ink); }
+  header {
+    background: linear-gradient(135deg, #0b3c5c 0%, #1573a8 100%); color:#fff;
+    padding: 34px 40px 30px;
+  }
+  header h1 { font-size: 24px; letter-spacing: .3px; }
+  header p { margin-top: 8px; opacity: .85; font-size: 14px; max-width: 860px; line-height: 1.55; }
+  .wrap { max-width: 1200px; margin: 0 auto; padding: 26px 24px 70px; }
+  .cards { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; margin-bottom: 26px; }
+  .kpi { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 14px 16px; }
+  .kpi .lab { font-size: 12px; color: var(--mut); text-transform: uppercase; letter-spacing: .6px; }
+  .kpi .val { font-size: 23px; font-weight: 700; margin-top: 5px; }
+  .kpi .sub { font-size: 12px; color: var(--mut); margin-top: 4px; }
+  .kpi .badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px;
+                border-radius: 20px; margin-top: 6px; }
+  .b-grace { background:#e8f4ec; color:#1e8449; }
+  .b-crit  { background:#fdf0ef; color:#b03a2e; }
+  .panel { background: var(--card); border: 1px solid var(--line); border-radius: 12px; padding: 18px 20px; }
+  .panel h3 { font-size: 15px; margin-bottom: 6px; }
+  .panel h3 small { font-weight: 400; color: var(--mut); }
+  .panel .note { font-size: 12px; color: var(--mut); margin-bottom: 12px; }
+  .chartbox { position: relative; height: 320px; }
+  .grid { display: grid; grid-template-columns: 1fr 1fr; gap: 18px; margin-top: 18px; }
+  .grid .full { grid-column: 1 / -1; }
+  table { width: 100%; border-collapse: collapse; font-size: 12.5px; }
+  th, td { text-align: left; padding: 6px 9px; border-bottom: 1px solid var(--line); }
+  th { color: var(--mut); font-weight: 600; font-size: 11px; text-transform: uppercase; letter-spacing: .5px; }
+  .law { background: var(--warn); border-left: 4px solid var(--accent); padding: 10px 14px;
+         border-radius: 0 8px 8px 0; margin: 18px 0 4px; }
+  .law b { color: var(--accent); }
+  @media (max-width: 880px) { .grid { grid-template-columns: 1fr; } }
+</style>
+</head>
+<body>
+<header>
+  <h1>SimLeap</h1>
+  <p>How does the fidelity budget of a simulator decide whether a policy
+     transfers? One policy is calibrated in a reference simulator, then
+     replayed, unchanged, as five physical knobs are degraded one at a time —
+     control period, ground friction, contact rigidity, sensor noise, and
+     observation delay. Each knob is a budget you can spend or save; this
+     dashboard maps exactly where reliability collapses.</p>
+</header>
+
+<div class="wrap">
+  <div class="cards" id="kpis"></div>
+
+  <div class="law">
+    <b>Headline:</b> only sensor noise fails <b>gracefully</b> (wide cliff —
+    reliability erodes over a long budget range and never fully collapses), while
+    dt, mu, k and delay all fail at a <b>critical point</b> (narrow cliff — one
+    small step below the safe budget and the policy stops transferring entirely).
+    The failure mode says which knob broke: escape = the block cannot be stopped
+    (friction), timeout = the push cannot finish (dt / k / delay).
+  </div>
+
+  <div class="panel">
+    <h3>The fidelity cliff <small>· transfer reliability vs normalised budget</small></h3>
+    <div class="note">Budget 1.0 = the reference simulator. Shaded markers are Wilson 95% intervals.</div>
+    <div class="chartbox"><canvas id="chartCliff"></canvas></div>
+  </div>
+
+  <div class="grid">
+    <div class="panel">
+      <h3>Failure modes at the cliff <small>· timeout vs escape</small></h3>
+      <div class="note">Timeout = the push never finishes in 15 s; escape = the block is lost off-workspace.
+        Axis: <select id="failAxis" style="margin-left:6px"></select></div>
+      <div class="chartbox"><canvas id="chartFailure"></canvas></div>
+    </div>
+    <div class="panel">
+      <h3>Budget stretch <small>· how much fidelity you can sacrifice</small></h3>
+      <div class="note">Green = safe (≥ 90%); red = the cliff down to 10%.</div>
+      <div class="chartbox"><canvas id="chartStretch"></canvas></div>
+    </div>
+  </div>
+
+  <div class="panel" style="margin-top:18px">
+    <h3>Per-axis budget table</h3>
+    <table>
+      <thead><tr><th>Axis</th><th>Reference</th><th>Critical b*</th><th>Safe ≥ 90%</th>
+      <th>Collapse ≤ 10%</th><th>Cliff width</th><th>Failure mode</th><th>Non-mono steps</th></tr></thead>
+      <tbody id="axisTable"></tbody>
+    </table>
+  </div>
+</div>
+
+<script>
+const LABELS = {
+  dt: "control period dt", mu: "ground friction mu", k: "contact rigidity k",
+  noise: "sensor noise", delay: "observation delay",
+};
+const ORDER = ["dt", "mu", "k", "noise", "delay"];
+const COLORS = ["#1a5276", "#1e8449", "#b03a2e", "#6c3483", "#ca6f1e"];
+
+let summary = null;
+let raw = null;
+let failChart = null;
+let stretchChart = null;
+
+async function load() {
+  const [s, r] = await Promise.all([
+    fetch("/api/summary").then(r => r.json()),
+    fetch("/sweep.json").then(r => r.json()),
+  ]);
+  summary = s; raw = r;
+  render();
+}
+
+function render() {
+  renderKpis();
+  renderCliff();
+  initFailureSelector();
+  renderFailure();
+  renderStretch();
+  renderTable();
+}
+
+function initFailureSelector() {
+  const sel = document.getElementById("failAxis");
+  sel.innerHTML = ORDER.map(a => `<option value="${a}">${LABELS[a]}</option>`).join("");
+  sel.value = "dt";
+  sel.onchange = renderFailure;
+}
+
+function renderKpis() {
+  const axes = summary.axes;
+  const el = document.getElementById("kpis");
+  el.innerHTML = ORDER.map((a, i) => {
+    const ax = axes[a];
+    const c = ax.cliff;
+    const graceful = c.cliff_width >= 0.15;
+    return `<div class="kpi">
+      <div class="lab">${LABELS[a]}</div>
+      <div class="val">b* = ${c.critical_budget.toFixed(2)}</div>
+      <div class="sub">width ${c.cliff_width.toFixed(2)} · ${c.dominant_failure}</div>
+      <span class="badge ${graceful ? "b-grace" : "b-crit"}">${graceful ? "graceful" : "critical point"}</span>
+    </div>`;
+  }).join("");
+}
+
+function renderCliff() {
+  const ctx = document.getElementById("chartCliff");
+  const datasets = ORDER.map((a, i) => {
+    const pts = summary.axes[a].points;
+    return {
+      label: LABELS[a],
+      data: pts.map(p => ({ x: p.budget, y: +(p.rate * 100).toFixed(1) })),
+      borderColor: COLORS[i], backgroundColor: COLORS[i], pointRadius: 3.5, tension: 0,
+    };
+  });
+  new Chart(ctx, {
+    type: "line",
+    data: { datasets },
+    options: {
+      scales: {
+        x: { type: "linear", min: 0, max: 1.03, title: { display: true, text: "fidelity budget (1 = reference)" } },
+        y: { min: 0, max: 105, title: { display: true, text: "success (%)" } },
+      },
+      plugins: {
+        legend: { position: "bottom" },
+        annotation: undefined,
+      },
+    },
+  });
+}
+
+function renderFailure() {
+  const ctx = document.getElementById("chartFailure");
+  const axis = document.getElementById("failAxis").value || "dt";
+  const pts = summary.axes[axis].points;
+  const vals = pts.map(p => p.value);
+  const succ = pts.map(p => +(p.rate * 100).toFixed(1));
+  const to = pts.map(p => +(p.timeout_rate * 100).toFixed(1));
+  const esc = pts.map(p => +(p.escaped_rate * 100).toFixed(1));
+  if (failChart) failChart.destroy();
+  failChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: vals,
+      datasets: [
+        { label: "success", data: succ, backgroundColor: "#27ae60" },
+        { label: "timeout", data: to, backgroundColor: "#e8c4c0" },
+        { label: "escape", data: esc, backgroundColor: "#d6eaf8" },
+      ],
+    },
+    options: {
+      scales: {
+        x: { stacked: true, title: { display: true, text: `${LABELS[axis]} value` } },
+        y: { stacked: true, max: 100, title: { display: true, text: "episodes (%)" } },
+      },
+      plugins: { legend: { position: "bottom" },
+                 title: { display: true, text: `${LABELS[axis]} — success / timeout / escape at every grid point` } },
+    },
+  });
+}
+
+function renderStretch() {
+  const ctx = document.getElementById("chartStretch");
+  const axes = summary.axes;
+  const safe = ORDER.map(a => axes[a].cliff.safe_budget);
+  const collapse = ORDER.map(a => axes[a].cliff.collapse_budget);
+  if (stretchChart) stretchChart.destroy();
+  stretchChart = new Chart(ctx, {
+    type: "bar",
+    data: {
+      labels: ORDER.map(a => LABELS[a]),
+      datasets: [
+        { label: "dead (reliability gone)", data: collapse, backgroundColor: "#aab7c4" },
+        { label: "cliff (90%\u219210%)", data: safe.map((s, i) => +(s - collapse[i]).toFixed(3)), backgroundColor: "#b03a2e" },
+        { label: "safe (\u226590%)", data: safe.map(s => +(1 - s).toFixed(3)), backgroundColor: "#1e8449" },
+      ],
+    },
+    options: {
+      scales: { x: { stacked: true }, y: { stacked: true, beginAtZero: true, max: 1.06, title: { display: true, text: "fidelity budget" } } },
+      plugins: { legend: { position: "bottom" } },
+    },
+  });
+}
+
+function renderTable() {
+  const tb = document.getElementById("axisTable");
+  tb.innerHTML = ORDER.map(a => {
+    const ax = summary.axes[a];
+    const c = ax.cliff;
+    return `<tr><td><b>${LABELS[a]}</b></td>
+      <td>${(ax.reference_rate * 100).toFixed(0)}%</td>
+      <td>${c.critical_budget.toFixed(3)}</td>
+      <td>${c.safe_budget == null ? "—" : c.safe_budget.toFixed(3)}</td>
+      <td>${c.collapse_budget == null ? "—" : c.collapse_budget.toFixed(3)}</td>
+      <td>${c.cliff_width == null ? "—" : c.cliff_width.toFixed(3)}</td>
+      <td>${c.dominant_failure}</td>
+      <td>${ax.monotonicity.non_monotone_steps}</td></tr>`;
+  }).join("");
+}
+
+load();
+</script>
+</body>
+</html>

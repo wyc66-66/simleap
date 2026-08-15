@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>SimLeap Technical Report</title>
+<style>
+body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 900px; margin: 0 auto;
+       padding: 42px 28px 80px; color: #1c2733; line-height: 1.65; background: #fff; }
+h1 { font-size: 26px; border-bottom: 3px solid #0e5a8a; padding-bottom: 10px; }
+h2 { font-size: 19px; margin-top: 34px; color: #0e5a8a; }
+h3 { font-size: 15px; margin-top: 24px; }
+table { border-collapse: collapse; width: 100%; margin: 14px 0; font-size: 13.5px; }
+th, td { border: 1px solid #e3e9f0; padding: 7px 10px; text-align: left; }
+th { background: #f2f6fa; }
+img { max-width: 100%; border: 1px solid #e3e9f0; border-radius: 8px; margin: 10px 0; }
+blockquote { border-left: 4px solid #0e5a8a; margin: 14px 0; padding: 4px 16px; background: #f2f6fa; }
+code { background: #f2f6fa; padding: 2px 5px; border-radius: 4px; font-size: 13px; }
+</style></head><body>
+<h1>SimLeap: How Much Simulator Fidelity Can You Give Up Before the Policy Stops Transferring?</h1>
+<p><em>Fidelity budgets and their cliffs for a contact-rich manipulation policy</em></p>
+<p><strong>Subject:</strong> sim-to-real-style transfer of a fixed-gain manipulation policy across
+degraded simulators
+<strong>Method:</strong> a deterministic 2D pushing task, one policy calibrated at reference
+fidelity, five physical knobs swept one at a time over 84 budget cells × 300 seeds
+<strong>Main result:</strong> four of five fidelity budgets collapse at a critical point; only
+sensor noise degrades gracefully — and the failure mode tells you which knob broke</p>
+<hr />
+<h2>Abstract</h2>
+<p>Real2Sim2Real loops assume the simulator is a faithful stand-in for reality — but
+only up to a point. That point, the <em>fidelity budget</em> at which a calibrated policy
+stops transferring, is almost never measured. We build a deterministic 2D pushing
+task, calibrate a PD push policy once in a reference (high-fidelity) simulator,
+then replay it — unchanged — as five physical knobs are degraded one at a time:
+the control period <code>dt</code>, ground friction <code>mu</code>, contact rigidity <code>k</code>, sensor noise,
+and observation delay.</p>
+<p>Three results, each precise enough to be a design rule:</p>
+<ol>
+<li><strong>The amplitude–phase law.</strong> The two knobs that corrupt the same observation
+   channel produce opposite cliff shapes. Sensor noise (an <em>amplitude</em>
+   perturbation) degrades reliability gracefully over a wide budget range and
+   never fully kills it — a ~15% floor survives total budget exhaustion. Sensor
+   delay (a <em>phase</em> perturbation on the feedback loop) collapses reliability at a
+   critical point, the way time delay destroys phase margin in classical control.</li>
+<li><strong>The dynamics-knob law.</strong> Control period, friction and contact rigidity are
+   all critical-point failures: reliability holds ≥90% until a sharp physical
+   threshold, then collapses to &lt;10% within a few percent of budget. The fixed-gain
+   policy is only valid inside a narrow neighbourhood of the dynamics it was
+   calibrated on. Friction is the sharpest cliff of all: a 0.01 change in <code>mu</code>
+   (0.185 → 0.175) takes reliability from 100% to 0%.</li>
+<li><strong>The mechanism law.</strong> The dominant failure mode identifies the mechanism.
+   <em>Escape</em> (the block is lost off-workspace) means a loss of control authority —
+   friction can no longer stop the block. <em>Timeout</em> (the push never finishes) means
+   a loss of responsiveness — the actuator, the contact, or the feedback loop is
+   too slow to complete the task in time.</li>
+</ol>
+<h2>1. Motivation</h2>
+<p>Every simulation budget is a negotiation: cheaper simulators run faster, but a
+policy that works in the simulator stops working when the sim stops being a
+faithful stand-in. Where exactly is the boundary? A contact-rich pushing task is
+the sharpest possible probe, because the whole policy rests on a handful of
+physical quantities — how fast the actuator responds, how much friction the ground
+provides, how rigid the contact is — that the simulator controls directly.</p>
+<p>We answer a quantitative question: <strong>for each fidelity knob, what is the smallest
+budget that keeps transfer reliability above 90%, and what happens just below it?</strong></p>
+<h2>2. Task design</h2>
+<p>A circular pusher (radius 0.35 m) drives a block (radius 0.25 m) from a jittered
+start position toward a goal 4 m away. The goal is a disc of radius 0.18 m; the
+episode must finish within 15 s. Success means the block <em>enters</em> the goal and
+<em>comes to rest</em> (speed below 0.05 m/s); failure is either a <em>timeout</em> (15 s
+elapsed) or an <em>escape</em> (the block leaves the ±6 m workspace).</p>
+<p>Physics advances on a fixed 2 ms substep. The contact model is deliberately
+quasi-static and analytic so that each fidelity knob has a clean, interpretable
+effect:</p>
+<ul>
+<li><strong>Control period <code>dt</code>.</strong> The policy re-decides every <code>dt</code> seconds while physics
+  steps at 2 ms. The actuator is a critically-damped second-order system whose
+  bandwidth equals the control rate <code>1/dt</code>: a coarse control period simply cannot
+  execute high-frequency commands, and the pusher acts with progressively staler,
+  more sluggish authority.</li>
+<li><strong>Ground friction <code>mu</code>.</strong> The block decelerates at <code>mu·g</code> once sliding; a low
+  coefficient lets it coast through the goal instead of stopping.</li>
+<li><strong>Contact rigidity <code>k</code>.</strong> The block absorbs a fraction <code>k</code> of the pusher's push
+  velocity (1 = rigid, ≪1 = soggy contact). A soft contact also lets the block
+  <em>skid</em> sideways off the push line.</li>
+<li><strong>Sensor noise.</strong> A fixed per-episode perturbation trajectory is scaled by the
+  noise budget and added to the policy's observations of pusher and block.</li>
+<li><strong>Observation delay.</strong> The policy sees the state as it was <code>delay</code> seconds ago.</li>
+</ul>
+<h2>3. The policy and the transfer protocol</h2>
+<p>The policy is a PD position controller (positional gain 80, damping 15, acceleration
+limit 60 m/s²) that aims at a point 0.30 m behind the block, along the direction
+from block to goal, and brakes hard (gain 40) once the block is inside the goal.
+Gains are calibrated <em>once</em> at the reference configuration and frozen; every
+degraded run replays the identical controller. Degradation is entirely a property
+of the simulator, never of the policy — this is exactly the sim-to-real transfer
+that the sweep measures.</p>
+<p>The sweep varies one knob at a time over a grid of 16–18 values spanning the
+reference value down to a fully degraded one (84 cells in total), running 300
+deterministic seeds per cell (25,200 episodes, minutes on a laptop). Each grid
+point is normalised to a <strong>fidelity budget</strong> <code>b ∈ [0, 1]</code>, where <code>b = 1</code> is the
+reference simulator and <code>b = 0</code> is the most degraded configuration sampled.</p>
+<h2>4. Results</h2>
+<p><img alt="The fidelity cliff" src="figures/fig1_fidelity_cliff.png" /></p>
+<p>Every axis starts at 100% reliability and degrades monotonically. The summary:</p>
+<table>
+<thead>
+<tr>
+<th>Axis</th>
+<th>Critical budget b*</th>
+<th>Critical value</th>
+<th>Safe (≥90%)</th>
+<th>Collapse (≤10%)</th>
+<th>Width</th>
+<th>Dominant failure</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Friction <code>mu</code></td>
+<td>0.044</td>
+<td>0.179</td>
+<td>b ≥ 0.054 (<code>mu ≥ 0.185</code>)</td>
+<td>b ≤ 0.038 (<code>mu ≤ 0.175</code>)</td>
+<td><strong>0.015</strong></td>
+<td>escape</td>
+</tr>
+<tr>
+<td>Contact rigidity <code>k</code></td>
+<td>0.191</td>
+<td>0.433</td>
+<td>b ≥ 0.207 (<code>k ≥ 0.445</code>)</td>
+<td>b ≤ 0.179 (<code>k ≤ 0.425</code>)</td>
+<td><strong>0.028</strong></td>
+<td>timeout</td>
+</tr>
+<tr>
+<td>Control period <code>dt</code></td>
+<td>0.404</td>
+<td>0.153 s</td>
+<td>b ≥ 0.458 (<code>dt ≤ 0.14 s</code>)</td>
+<td>b ≤ 0.375 (<code>dt ≥ 0.16 s</code>)</td>
+<td><strong>0.083</strong></td>
+<td>timeout</td>
+</tr>
+<tr>
+<td>Sensor delay</td>
+<td>0.463</td>
+<td>0.269 s</td>
+<td>b ≥ 0.520 (<code>delay ≤ 0.24 s</code>)</td>
+<td>b ≤ 0.420 (<code>delay ≥ 0.29 s</code>)</td>
+<td><strong>0.100</strong></td>
+<td>timeout</td>
+</tr>
+<tr>
+<td>Sensor noise</td>
+<td>0.777</td>
+<td>0.179 m</td>
+<td>b ≥ 0.825 (<code>noise ≤ 0.14 m</code>)</td>
+<td><em>never</em> (floor ≈ 15%)</td>
+<td><strong>0.225</strong></td>
+<td>escape → timeout</td>
+</tr>
+</tbody>
+</table>
+<h3>4.1 The amplitude–phase law: noise is graceful, delay is critical</h3>
+<p><img alt="Budget stretch" src="figures/fig3_budget_stretch.png" /></p>
+<p>The two knobs on the same observation channel behave completely differently.
+Sensor noise is the <em>only</em> graceful axis: reliability erodes continuously from
+100% at <code>noise = 0</code> to ~70% at 0.16 m, crosses 50% at <code>noise ≈ 0.18 m</code> — the
+same order as the 0.18 m goal radius — and then settles on a floor of 12–17%
+that survives even total budget exhaustion. Noise perturbs the <em>amplitude</em> of
+the observation; the feedback loop stays stable and the policy still converges,
+just to a noisier, worse point.</p>
+<p>Sensor delay is the opposite. Reliability holds at ~100% until <code>delay ≈ 0.24 s</code>,
+then collapses: 83% at 0.26 s, 45% at 0.27 s, 26% at 0.28 s, 6% at 0.29 s.
+Delay perturbs the <em>phase</em> of the feedback loop, and phase lag has a hard
+stability boundary — the classical delay margin. An amplitude perturbation
+degrades you continuously; a phase perturbation breaks the loop at a threshold.</p>
+<h3>4.2 The dynamics-knob law: calibrated policies live in a narrow neighbourhood</h3>
+<p>Friction, contact rigidity and control period all produce the same pattern:
+reliability sits at 100% across a large range, then falls off a cliff in a few
+steps of the grid.</p>
+<p>Friction is the sharpest. The block decelerates at <code>mu·g</code>, so the braking
+requirement — stop the block inside the 0.18 m goal — sets a threshold. Above
+<code>mu = 0.185</code> reliability is 100%; below <code>mu = 0.175</code> it is 0%. The entire
+transition happens across <code>Δmu = 0.01</code>. The dominant failure at the cliff is
+<em>escape</em>: the block coasts through the goal, never stops, and slides off the
+workspace. This is a pure loss of control authority.</p>
+<p>Contact rigidity collapses at <code>k ≈ 0.43</code>: below it, the block moves at less than
+half the push speed, the push crawls, and every episode ends in timeout. The
+control-period cliff sits at <code>dt ≈ 0.15 s</code> — an actuator bandwidth of ~6.5 Hz,
+below which the critically-damped actuator cannot track the PD commands fast
+enough to finish the push; failures are again timeout.</p>
+<p><img alt="Failure modes" src="figures/fig2_failure_modes.png" /></p>
+<h3>4.3 The mechanism law: failure modes name the broken knob</h3>
+<p>The failure-mode decomposition (success / timeout / escape at every grid point)
+makes the mechanism legible. Escape is caused by friction and, at the noise cliff,
+by the observed goal being offset — the policy pushes the block past the goal.
+Timeout is caused by <code>dt</code>, <code>k</code> and <code>delay</code> — the push is too slow to finish, the
+contact transmits too little force, or the loop acts on a state too old to brake
+in time. Given a simulator that reports low reliability, the failure mode alone
+narrows the fault to one knob.</p>
+<h2>5. Discussion</h2>
+<p>Three design rules for anyone spending a simulation budget:</p>
+<ol>
+<li><strong>Treat noise as the free budget.</strong> You can discard ~18% of the noise budget
+   before reliability drops below 90%, and even total noise only costs you to a
+   ~15% floor. Noise is the knob to economise on when a simulator needs to be
+   cheap.</li>
+<li><strong>Never cross a dynamics threshold on faith.</strong> Friction, rigidity and control
+   period are forgiving up to a razor-thin edge — <code>mu</code> tolerates degradation down
+   to 23% of its reference value, then fails across a 0.01 step. A simulator that
+   is "close to" the reference on these axes must be <em>verified</em>, not assumed:
+   the safe region and the cliff sit adjacent to each other.</li>
+<li><strong>Read the failure mode.</strong> Escape means the block cannot be stopped (fix
+   friction); timeout means the push cannot finish (fix control rate, contact
+   rigidity, or feedback latency). The reliability curve tells you <em>where</em> you
+   are; the failure mode tells you <em>which knob</em> to repair.</li>
+</ol>
+<p>The cliff shapes also validate the quasi-static model itself: the five axes
+degrade monotonically, the reference simulator transfers perfectly, and the
+brittle/critical axes collapse cleanly at physically meaningful thresholds —
+friction at the brake limit, rigidity at half the push speed, delay at the loop's
+phase margin, noise at the scale of the goal itself.</p>
+<h2>6. Reproducibility</h2>
+<ul>
+<li><strong>Simulator:</strong> deterministic 2D pushing, 2 ms substep, quasi-static analytic
+  contact, critically-damped second-order actuator for <code>dt</code>; noise uses a fixed
+  per-episode perturbation scaled by the budget (see <code>src/simleap/sim.py</code>)</li>
+<li><strong>Policy:</strong> fixed PD position controller with standoff and brake, calibrated
+  once (see <code>src/simleap/policy.py</code>)</li>
+<li><strong>Sweep:</strong> 5 axes × 16–18 grid points = 84 cells × 300 seeds = 25,200 episodes</li>
+<li><strong>Data:</strong> <code>results/sweep.json</code>; verify with <code>python -m simleap.check</code>, extract
+  claims with <code>scripts/paper_facts.py</code>, figures with <code>scripts/render_figures.py</code></li>
+<li><strong>Cost:</strong> pure-Python; the full sweep runs in minutes on a laptop</li>
+</ul>
+</body></html>
