@@ -50,8 +50,26 @@ the sharpest possible probe, because the whole policy rests on a handful of
 physical quantities — how fast the actuator responds, how much friction the ground
 provides, how rigid the contact is — that the simulator controls directly.
 
-We answer a quantitative question: **for each fidelity knob, what is the smallest
-budget that keeps transfer reliability above 90%, and what happens just below it?**
+The question is not hypothetical. The DISCOVERSE family of simulators — built
+for Real2Sim2Real robot learning, from the 3DGS-based DISCOVERSE platform [4] to
+the high-throughput GS-Playground with its parallel physics engine and batch
+Gaussian-Splatting renderer [5] — makes the promise that a policy trained in a
+photorealistic digital twin transfers to the real robot with zero fine-tuning.
+What neither paper measures is the *safety margin* of that promise: both
+simulators present fidelity as a monolithic property that is uniformly high, and
+report a single aggregate Sim2Real success rate. A deployment engineer who has
+to decide *where* to spend the next compute cycle — on a smaller control period,
+better ground friction, stiffer contacts, cleaner sensors, or lower latency — is
+given no budget table. The Real2Sim pipeline behind these platforms reconstructs
+every part of the scene with equal effort, on the implicit assumption that all
+fidelity is equally valuable.
+
+We challenge that assumption. We answer a quantitative question: **for each
+fidelity knob, what is the smallest budget that keeps transfer reliability above
+90%, and what happens just below it?** The result is a budget table that the
+DISCOVERSE-class of Real2Sim2Real loops can spend against: which knobs must be
+held at reference fidelity, which tolerate aggressive degradation, and which
+announce their failure through a diagnosable failure mode.
 
 ## 2. Task design
 
@@ -158,7 +176,39 @@ contact transmits too little force, or the loop acts on a state too old to brake
 in time. Given a simulator that reports low reliability, the failure mode alone
 narrows the fault to one knob.
 
-## 5. Discussion
+## 5. Related Work
+
+**Real2Sim2Real simulation platforms.** The direct context for this study is the
+line of work from the DISCOVER Lab at Tsinghua AIR. DISCOVERSE [4] is a modular,
+open-source simulation framework that reconstructs photorealistic digital twins
+of real scenes with 3D Gaussian Splatting and simulates them with MuJoCo,
+demonstrating state-of-the-art zero-shot Sim2Real transfer for imitation-learned
+policies. Its successor GS-Playground [5] couples a custom parallel physics
+engine (velocity-impulse, constraint-island parallelization) with a batch 3DGS
+renderer to reach ~10⁴ FPS across 2,048 parallel environments on a single GPU,
+and adds an automated Real2Sim pipeline that turns a single RGB image into a
+simulation-ready digital twin in minutes. Both systems report aggregate transfer
+success; neither reports how that success degrades as individual fidelity knobs
+are relaxed. Our sweep is the missing budget table for this class of loop.
+
+**Domain randomization and simulation tuning.** The standard answer to
+simulator gap is to randomize the simulator rather than measure it. Tobin et al.
+[6] randomize object textures, shapes and lighting to make policies robust
+across simulators; Bousmalis et al. [7] combine simulation with domain
+adaptation for grasping; more recent work randomizes physics parameters
+(contact, friction) explicitly [8]. Domain randomization asks *how broad a
+distribution the policy can survive*; we ask the complementary question *how
+much single-axis fidelity a fixed policy needs*. The two are orthogonal: a
+policy trained under randomization still lives inside the simulator's physical
+model, and that model's fidelity envelope is exactly what we map.
+
+**Simulator accuracy studies.** Comparisons of physics engines and integration
+schemes [9, 10] measure error in the simulator's own coordinates (trajectory
+RMSE, contact error) rather than in the downstream quantity an engineer cares
+about — whether a trained policy still transfers. Our work measures the policy
+outcome directly, which is the metric that determines deployment decisions.
+
+## 6. Discussion
 
 Three design rules for anyone spending a simulation budget:
 
@@ -182,7 +232,7 @@ brittle/critical axes collapse cleanly at physically meaningful thresholds —
 friction at the brake limit, rigidity at half the push speed, delay at the loop's
 phase margin, noise at the scale of the goal itself.
 
-## 6. Reproducibility
+## 7. Reproducibility
 
 - **Simulator:** deterministic 2D pushing, 2 ms substep, quasi-static analytic
   contact, critically-damped second-order actuator for `dt`; noise uses a fixed
@@ -193,3 +243,28 @@ phase margin, noise at the scale of the goal itself.
 - **Data:** `results/sweep.json`; verify with `python -m simleap.check`, extract
   claims with `scripts/paper_facts.py`, figures with `scripts/render_figures.py`
 - **Cost:** pure-Python; the full sweep runs in minutes on a laptop
+
+## References
+
+1. Todorov E., Erez T., Tassa Y. MuJoCo: A Physics Engine for Model-Based
+   Control. *IROS 2012*.
+2. Zhu Y., Wong J., Mandlekar A., et al. robosuite: A Modular Simulation
+   Framework and Benchmark for Robot Learning. *arXiv:2009.12293*, 2020.
+3. Makoviychuk V., Wawrzyniak L., Guo Y., et al. Isaac Gym: High Performance
+   GPU-Based Physics Simulation for Robot Learning. *NeurIPS 2021 Datasets and
+   Benchmarks*.
+4. Jia Y., Wang G., Dong Y., et al. DISCOVERSE: Efficient Robot Simulation in
+   Complex High-Fidelity Environments. *IROS 2025*, arXiv:2507.21981.
+5. Jia Y., Zhang H., Zhang Z., et al. GS-Playground: A High-Throughput
+   Photorealistic Simulator for Vision-Informed Robot Learning. *RSS 2026*,
+   arXiv:2604.25459.
+6. Tobin J., Fong R., Ray A., et al. Domain Randomization for Transferring Deep
+   Neural Networks from Simulation to the Real World. *IROS 2017*.
+7. Bousmalis K., Irpan A., Wohlhart P., et al. Using Simulation and Domain
+   Adaptation to Improve Efficiency of Deep Robotic Grasping. *ICRA 2018*.
+8. Andrychowicz M., Baker B., Chociej M., et al. Learning Dexterous In-Hand
+   Manipulation. *IJRR 2020*.
+9. Erez T., Tassa Y., Todorov E. Simulation Tools for Model-Based Robotics:
+   Comparison of Bullet, Havok, MuJoCo, ODE and PhysX. *ICRA 2015*.
+10. Hwangbo J., Lee J., Hutter M. Per-Contact Iteration Method for Solving
+    Contact Dynamics. *IEEE RA-L 2018*.

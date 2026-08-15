@@ -59,8 +59,25 @@ faithful stand-in. Where exactly is the boundary? A contact-rich pushing task is
 the sharpest possible probe, because the whole policy rests on a handful of
 physical quantities — how fast the actuator responds, how much friction the ground
 provides, how rigid the contact is — that the simulator controls directly.</p>
-<p>We answer a quantitative question: <strong>for each fidelity knob, what is the smallest
-budget that keeps transfer reliability above 90%, and what happens just below it?</strong></p>
+<p>The question is not hypothetical. The DISCOVERSE family of simulators — built
+for Real2Sim2Real robot learning, from the 3DGS-based DISCOVERSE platform [4] to
+the high-throughput GS-Playground with its parallel physics engine and batch
+Gaussian-Splatting renderer [5] — makes the promise that a policy trained in a
+photorealistic digital twin transfers to the real robot with zero fine-tuning.
+What neither paper measures is the <em>safety margin</em> of that promise: both
+simulators present fidelity as a monolithic property that is uniformly high, and
+report a single aggregate Sim2Real success rate. A deployment engineer who has
+to decide <em>where</em> to spend the next compute cycle — on a smaller control period,
+better ground friction, stiffer contacts, cleaner sensors, or lower latency — is
+given no budget table. The Real2Sim pipeline behind these platforms reconstructs
+every part of the scene with equal effort, on the implicit assumption that all
+fidelity is equally valuable.</p>
+<p>We challenge that assumption. We answer a quantitative question: <strong>for each
+fidelity knob, what is the smallest budget that keeps transfer reliability above
+90%, and what happens just below it?</strong> The result is a budget table that the
+DISCOVERSE-class of Real2Sim2Real loops can spend against: which knobs must be
+held at reference fidelity, which tolerate aggressive degradation, and which
+announce their failure through a diagnosable failure mode.</p>
 <h2>2. Task design</h2>
 <p>A circular pusher (radius 0.35 m) drives a block (radius 0.25 m) from a jittered
 start position toward a goal 4 m away. The goal is a disc of radius 0.18 m; the
@@ -199,7 +216,35 @@ Timeout is caused by <code>dt</code>, <code>k</code> and <code>delay</code> — 
 contact transmits too little force, or the loop acts on a state too old to brake
 in time. Given a simulator that reports low reliability, the failure mode alone
 narrows the fault to one knob.</p>
-<h2>5. Discussion</h2>
+<h2>5. Related Work</h2>
+<p><strong>Real2Sim2Real simulation platforms.</strong> The direct context for this study is the
+line of work from the DISCOVER Lab at Tsinghua AIR. DISCOVERSE [4] is a modular,
+open-source simulation framework that reconstructs photorealistic digital twins
+of real scenes with 3D Gaussian Splatting and simulates them with MuJoCo,
+demonstrating state-of-the-art zero-shot Sim2Real transfer for imitation-learned
+policies. Its successor GS-Playground [5] couples a custom parallel physics
+engine (velocity-impulse, constraint-island parallelization) with a batch 3DGS
+renderer to reach ~10⁴ FPS across 2,048 parallel environments on a single GPU,
+and adds an automated Real2Sim pipeline that turns a single RGB image into a
+simulation-ready digital twin in minutes. Both systems report aggregate transfer
+success; neither reports how that success degrades as individual fidelity knobs
+are relaxed. Our sweep is the missing budget table for this class of loop.</p>
+<p><strong>Domain randomization and simulation tuning.</strong> The standard answer to
+simulator gap is to randomize the simulator rather than measure it. Tobin et al.
+[6] randomize object textures, shapes and lighting to make policies robust
+across simulators; Bousmalis et al. [7] combine simulation with domain
+adaptation for grasping; more recent work randomizes physics parameters
+(contact, friction) explicitly [8]. Domain randomization asks <em>how broad a
+distribution the policy can survive</em>; we ask the complementary question <em>how
+much single-axis fidelity a fixed policy needs</em>. The two are orthogonal: a
+policy trained under randomization still lives inside the simulator's physical
+model, and that model's fidelity envelope is exactly what we map.</p>
+<p><strong>Simulator accuracy studies.</strong> Comparisons of physics engines and integration
+schemes [9, 10] measure error in the simulator's own coordinates (trajectory
+RMSE, contact error) rather than in the downstream quantity an engineer cares
+about — whether a trained policy still transfers. Our work measures the policy
+outcome directly, which is the metric that determines deployment decisions.</p>
+<h2>6. Discussion</h2>
 <p>Three design rules for anyone spending a simulation budget:</p>
 <ol>
 <li><strong>Treat noise as the free budget.</strong> You can discard ~18% of the noise budget
@@ -221,7 +266,7 @@ degrade monotonically, the reference simulator transfers perfectly, and the
 brittle/critical axes collapse cleanly at physically meaningful thresholds —
 friction at the brake limit, rigidity at half the push speed, delay at the loop's
 phase margin, noise at the scale of the goal itself.</p>
-<h2>6. Reproducibility</h2>
+<h2>7. Reproducibility</h2>
 <ul>
 <li><strong>Simulator:</strong> deterministic 2D pushing, 2 ms substep, quasi-static analytic
   contact, critically-damped second-order actuator for <code>dt</code>; noise uses a fixed
@@ -233,4 +278,29 @@ phase margin, noise at the scale of the goal itself.</p>
   claims with <code>scripts/paper_facts.py</code>, figures with <code>scripts/render_figures.py</code></li>
 <li><strong>Cost:</strong> pure-Python; the full sweep runs in minutes on a laptop</li>
 </ul>
+<h2>References</h2>
+<ol>
+<li>Todorov E., Erez T., Tassa Y. MuJoCo: A Physics Engine for Model-Based
+   Control. <em>IROS 2012</em>.</li>
+<li>Zhu Y., Wong J., Mandlekar A., et al. robosuite: A Modular Simulation
+   Framework and Benchmark for Robot Learning. <em>arXiv:2009.12293</em>, 2020.</li>
+<li>Makoviychuk V., Wawrzyniak L., Guo Y., et al. Isaac Gym: High Performance
+   GPU-Based Physics Simulation for Robot Learning. <em>NeurIPS 2021 Datasets and
+   Benchmarks</em>.</li>
+<li>Jia Y., Wang G., Dong Y., et al. DISCOVERSE: Efficient Robot Simulation in
+   Complex High-Fidelity Environments. <em>IROS 2025</em>, arXiv:2507.21981.</li>
+<li>Jia Y., Zhang H., Zhang Z., et al. GS-Playground: A High-Throughput
+   Photorealistic Simulator for Vision-Informed Robot Learning. <em>RSS 2026</em>,
+   arXiv:2604.25459.</li>
+<li>Tobin J., Fong R., Ray A., et al. Domain Randomization for Transferring Deep
+   Neural Networks from Simulation to the Real World. <em>IROS 2017</em>.</li>
+<li>Bousmalis K., Irpan A., Wohlhart P., et al. Using Simulation and Domain
+   Adaptation to Improve Efficiency of Deep Robotic Grasping. <em>ICRA 2018</em>.</li>
+<li>Andrychowicz M., Baker B., Chociej M., et al. Learning Dexterous In-Hand
+   Manipulation. <em>IJRR 2020</em>.</li>
+<li>Erez T., Tassa Y., Todorov E. Simulation Tools for Model-Based Robotics:
+   Comparison of Bullet, Havok, MuJoCo, ODE and PhysX. <em>ICRA 2015</em>.</li>
+<li>Hwangbo J., Lee J., Hutter M. Per-Contact Iteration Method for Solving
+    Contact Dynamics. <em>IEEE RA-L 2018</em>.</li>
+</ol>
 </body></html>
