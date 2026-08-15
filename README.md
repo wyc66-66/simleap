@@ -91,3 +91,8 @@ python -m simleap ui --port 8739
 
 The code, the figures, and every number in the report are produced by these
 scripts alone — no manual curation of results.
+---
+
+## Live report
+
+The technical report, figures and every number are served at **[https://wyc66-66.github.io/simleap/](https://wyc66-66.github.io/simleap/)**.
