@@ -64,26 +64,33 @@ def axis_curves(data: dict) -> dict[str, list[dict]]:
 
 
 def find_cliff(curve: list[dict], safe: float = 0.9, collapse: float = 0.1,
-               mid: float = 0.5) -> dict:
+               mid: float = 0.5, n_boot: int = 1000, seed: int = 0) -> dict:
     """Locate the fidelity cliff on a monotone degradation curve.
 
     ``safe_budget`` is the last budget with rate >= ``safe`` (the most
     degraded config that still transfers); ``collapse_budget`` is the first
     budget with rate <= ``collapse`` (reliability is gone). ``critical`` is
     the budget at which the curve crosses ``mid``, linearly interpolated.
+
+    ``critical_ci`` bootstraps each point's success count (binomial draws of
+    ``rate*n`` from ``n`` seeds), re-runs the same crossing detector on every
+    draw, and reports the 2.5/97.5 percentile of the crossing location. With
+    n=300 per cell the interval is tight; it is the honest answer to "how much
+    would b* move if you redrew the seeds".
     """
     xs = np.array([c["budget"] for c in curve])
     ys = np.array([c["rate"] for c in curve])
+    ns = np.array([c.get("n", 300) for c in curve])
 
-    def cross(target: float) -> float:
-        # going down the axis, budget decreases; find the crossing
-        for i in range(len(xs) - 1):
-            a, b = ys[i], ys[i + 1]
+    def cross_on(yv: np.ndarray, target: float) -> float:
+        for i in range(len(xv) - 1):
+            a, b = yv[i], yv[i + 1]
             if (a - target) * (b - target) <= 0:
                 t = (target - a) / (b - a) if b != a else 0.0
-                return float(xs[i] + t * (xs[i + 1] - xs[i]))
-        return float(xs[0] if ys[0] >= target else xs[-1])
+                return float(xv[i] + t * (xv[i + 1] - xv[i]))
+        return float(xv[0] if yv[0] >= target else xv[-1])
 
+    xv = xs
     safe_budget = next((c["budget"] for c in reversed(curve) if c["rate"] >= safe),
                        curve[0]["budget"] if curve[0]["rate"] >= safe else None)
     collapse_budget = next((c["budget"] for c in curve if c["rate"] <= collapse),
@@ -96,7 +103,22 @@ def find_cliff(curve: list[dict], safe: float = 0.9, collapse: float = 0.1,
         min_pt = min(curve, key=lambda c: c["rate"])
         if min_pt["rate"] < 0.5:
             collapse_budget = min_pt["budget"]
-    critical = cross(mid)
+    critical = cross_on(ys, mid)
+
+    rng = np.random.default_rng(seed)
+    successes = np.round(ys * ns).astype(int)
+    crossings: list[float] = []
+    for _ in range(n_boot):
+        boot = np.array([
+            rng.binomial(n, k / n) / n if n > 0 else 0.0
+            for k, n in zip(successes, ns)
+        ])
+        crossings.append(cross_on(boot, mid))
+    arr = np.asarray(crossings)
+    critical_ci = (
+        [float(np.percentile(arr, 2.5)), float(np.percentile(arr, 97.5))]
+        if len(arr) else None
+    )
 
     # dominant failure mode around the cliff
     near = min(curve, key=lambda c: abs(c["budget"] - critical))
@@ -107,6 +129,7 @@ def find_cliff(curve: list[dict], safe: float = 0.9, collapse: float = 0.1,
         "collapse_budget": collapse_budget,
         "reaches_collapse": reaches_collapse,
         "critical_budget": critical,
+        "critical_ci": critical_ci,
         "cliff_width": (safe_budget - collapse_budget) if (safe_budget is not None
                                                           and collapse_budget is not None) else None,
         "dominant_failure": dominant,

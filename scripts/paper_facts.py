@@ -47,6 +47,7 @@ def main() -> None:
         rows.append({
             "axis": axis, "label": LABELS[axis], "ref": a["reference_rate"],
             "critical_budget": c["critical_budget"], "critical_value": crit_val,
+            "critical_ci": c.get("critical_ci"),
             "safe_budget": c["safe_budget"], "collapse_budget": c["collapse_budget"],
             "reaches_collapse": c["reaches_collapse"],
             "cliff_width": c["cliff_width"], "failure": c["dominant_failure"],
@@ -57,7 +58,9 @@ def main() -> None:
     for r in rows:
         print(f"\n{r['label']}")
         print(f"  reference: {r['ref']:.2%}")
-        print(f"  critical b* = {r['critical_budget']:.3f}  (value {r['critical_value']:.3f})")
+        ci = r.get("critical_ci")
+        ci_txt = f"  [95% bootstrap CI {ci[0]:.3f}..{ci[1]:.3f}]" if ci else ""
+        print(f"  critical b* = {r['critical_budget']:.3f}  (value {r['critical_value']:.3f}){ci_txt}")
         print(f"  safe (>=90%) at budget {r['safe_budget']:.3f}; "
               f"collapse (<=10%) at budget {r['collapse_budget']:.3f}"
               f"{'' if r['reaches_collapse'] else '  [floor, never <=10%]'}")

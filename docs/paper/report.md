@@ -129,13 +129,19 @@ of up to ~5 percentage points (the largest is a delay-axis recovery from 87.7%
 to 92.7%), all well inside the 300-seed sampling noise (see `check.py`). The
 summary:
 
-| Axis | Critical budget b\* | Critical value | Safe (≥90%) | Collapse (≤10%) | Width | Dominant failure |
+| Axis | Critical budget b\* (95% bootstrap CI) | Critical value | Safe (≥90%) | Collapse (≤10%) | Width | Dominant failure |
 |---|---|---|---|---|---|---|
-| Friction `mu` | 0.044 | 0.179 | b ≥ 0.054 (`mu ≥ 0.185`) | b ≤ 0.038 (`mu ≤ 0.175`) | **0.015** | escape |
-| Contact rigidity `k` | 0.191 | 0.433 | b ≥ 0.207 (`k ≥ 0.445`) | b ≤ 0.179 (`k ≤ 0.425`) | **0.028** | timeout |
-| Control period `dt` | 0.404 | 0.153 s | b ≥ 0.458 (`dt ≤ 0.14 s`) | b ≤ 0.375 (`dt ≥ 0.16 s`) | **0.083** | timeout |
-| Observation delay | 0.463 | 0.269 s | b ≥ 0.520 (`delay ≤ 0.24 s`) | b ≤ 0.420 (`delay ≥ 0.29 s`) | **0.100** | timeout |
-| Sensor noise | 0.777 | 0.179 m | b ≥ 0.825 (`noise ≤ 0.14 m`) | *never* (floor 12–17%) | — | escape → timeout |
+| Friction `mu` | 0.044 [0.044, 0.044] | 0.179 | b ≥ 0.054 (`mu ≥ 0.185`) | b ≤ 0.038 (`mu ≤ 0.175`) | **0.015** | escape |
+| Contact rigidity `k` | 0.191 [0.190, 0.192] | 0.433 | b ≥ 0.207 (`k ≥ 0.445`) | b ≤ 0.179 (`k ≤ 0.425`) | **0.028** | timeout |
+| Control period `dt` | 0.404 [0.402, 0.406] | 0.153 s | b ≥ 0.458 (`dt ≤ 0.14 s`) | b ≤ 0.375 (`dt ≥ 0.16 s`) | **0.083** | timeout |
+| Observation delay | 0.463 [0.460, 0.465] | 0.269 s | b ≥ 0.520 (`delay ≤ 0.24 s`) | b ≤ 0.420 (`delay ≥ 0.29 s`) | **0.100** | timeout |
+| Sensor noise | 0.777 [0.770, 0.782] | 0.179 m | b ≥ 0.825 (`noise ≤ 0.14 m`) | *never* (floor 12–17%) | — | escape → timeout |
+
+The 95% CIs on b\* come from 1,000-draw binomial bootstrap (each cell's
+success count resampled from its 300 seeds, the crossing detector re-run on
+every draw, 2.5/97.5 percentiles). With n=300 per cell the intervals are
+tight — the sharpest cliff (`mu`) has width 0.000, the widest (`noise`) 0.012 —
+so the reported cliff locations are not point estimates on a knife's edge.
 
 ### 4.1 Amplitude vs phase: noise is graceful, delay is critical
 

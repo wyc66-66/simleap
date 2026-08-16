@@ -10,9 +10,14 @@ then replay it — unchanged — as five physical knobs are degraded one at a ti
 The result is a set of **fidelity cliffs**: for every knob, the exact budget at
 which reliability collapses.
 
-This is the same trade-off every Real2Sim2Real loop faces: simulation is
-always cheaper, faster and safer than reality, but only up to the point where
-the sim stops being a faithful stand-in. We quantify where that point is.
+This is the same trade-off every Real2Sim2Real loop faces — and the specific
+question the DISCOVERSE / GS-Playground line of simulators (Tsinghua AIR DISCOVER
+Lab) is built on. Both platforms deliver photorealistic digital twins that
+transfer to a real robot with zero fine-tuning; that promise holds *only up to*
+the fidelity the digital twin actually preserves. This project quantifies where
+that point is: which knobs a sim2real pipeline must hold at reference fidelity,
+which tolerate aggressive degradation, and which announce their failure through
+a diagnosable failure mode.
 
 > **Scope.** This is a within-simulator protocol — we measure the policy's
 > reliability boundary *inside* the simulator as fidelity degrades, not
@@ -66,7 +71,7 @@ pip install -e .          # installs numpy; tests need pytest
 pip install pytest
 
 # full sweep (84 budget cells × 300 seeds)
-PYTHONPATH=src python scripts/run_sweep.py --seeds 300 --out results/sweep.json
+python scripts/run_sweep.py --seeds 300 --out results/sweep.json
 
 # verify, analyse, render
 python -m simleap.check
@@ -74,9 +79,6 @@ python scripts/paper_facts.py --sweep results/sweep.json
 python scripts/render_figures.py --sweep results/sweep.json
 python scripts/render_paper.py
 ```
-
-> The `PYTHONPATH=src` prefix is bash syntax; on Windows PowerShell use
-> `$env:PYTHONPATH="src"; python scripts/run_sweep.py ...`.
 
 ## Tests
 

@@ -13,6 +13,7 @@ import subprocess
 from pathlib import Path
 
 import markdown
+import shutil
 
 ROOT = Path(__file__).resolve().parents[1]
 MD = ROOT / "docs" / "paper" / "report.md"
@@ -25,7 +26,16 @@ EDGE_CANDIDATES = [
     r"C:\Program Files\Microsoft\Edge\Application\msedge.exe",
     r"C:\Program Files\Google\Chrome\Application\chrome.exe",
     r"C:\Program Files (x86)\Google\Chrome\Application\chrome.exe",
-]
+    "/usr/bin/google-chrome",
+    "/usr/bin/google-chrome-stable",
+    "/usr/bin/chromium",
+    "/usr/bin/chromium-browser",
+    "/usr/bin/microsoft-edge",
+    "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+    "/Applications/Microsoft Edge.app/Contents/MacOS/Microsoft Edge",
+] + [shutil.which(n) for n in
+     ("google-chrome", "google-chrome-stable", "chromium", "chromium-browser",
+      "microsoft-edge", "msedge") if shutil.which(n)]
 
 CSS = """
 body { font-family: 'Segoe UI', system-ui, sans-serif; max-width: 900px; margin: 0 auto;
