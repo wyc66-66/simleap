@@ -236,7 +236,7 @@ Three design rules for anyone spending a simulation budget:
 
 1. **Treat noise as the free budget.** You can discard ~18% of the noise budget
    before reliability drops below 90%, and even total noise only costs you to a
-   ~15% floor. Noise is the knob to economise on when a simulator needs to be
+   12–17% floor. Noise is the knob to economise on when a simulator needs to be
    cheap.
 2. **Never cross a dynamics threshold on faith.** Friction, rigidity and control
    period are forgiving up to a razor-thin edge — `mu` tolerates degradation down
