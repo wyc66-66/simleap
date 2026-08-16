@@ -48,6 +48,24 @@ residual floor survives even total budget exhaustion. The *shape* of the cliff
 is diagnostic: it separates amplitude perturbations on the observation channel
 (graceful) from phase and dynamics perturbations on the closed loop (critical).
 
+## Deployment gate (built, not just proposed)
+
+The curves are turned into a **decision procedure** (`src/simleap/gate.py`):
+give it a digital-twin configuration (one value per fidelity axis) and it
+reports whether the twin sits on the safe side of every cliff. The safe side is
+the *continuous* interval that provably stays ≥ 90% — a non-contiguous recovery
+is rejected, not trusted (the delay axis's 92.7% at 0.24 s is an island inside
+a dip, so the gate refuses it). Audited against all 84 measured cells:
+
+```
+false accepts (approved but <90%):  0
+conservative rejects (recovery islands): 1   # delay=0.24 s
+sustained rejects:                  0
+```
+
+Safe-side thresholds: `dt ≤ 0.14 s`, `mu ≥ 0.185`, `k ≥ 0.445`,
+`noise ≤ 0.14 m`, `delay ≤ 0.20 s` (run `python -m simleap.gate` to rebuild).
+
 ## Repository layout
 
 ```
@@ -56,11 +74,13 @@ simleap/
 │   ├── sim.py          # deterministic 2D pushing physics + fidelity knobs
 │   ├── policy.py       # the calibrated PD push policy (never re-tuned)
 │   ├── analysis.py     # cliffs, failure modes, monotonicity
+│   ├── gate.py         # deployment gate: safe-side thresholds + audit
 │   ├── check.py        # sanity checks (reference 100%, monotonicity, cliffs)
 │   └── ui/app.py       # FastAPI dashboard
 ├── scripts/
 │   ├── run_sweep.py    # the fidelity-budget sweep (300 seeds / cell)
 │   ├── paper_facts.py  # every number the paper quotes, from sweep.json
+│   ├── gate_facts.py   # the gate thresholds + audit, from sweep.json
 │   ├── render_figures.py
 │   └── render_paper.py
 ├── ui/static/index.html
@@ -80,6 +100,8 @@ python scripts/run_sweep.py --seeds 300 --out results/sweep.json
 # verify, analyse, render
 python -m simleap.check
 python scripts/paper_facts.py --sweep results/sweep.json
+python -m simleap.gate --sweep results/sweep.json
+python scripts/gate_facts.py --sweep results/sweep.json
 python scripts/render_figures.py --sweep results/sweep.json
 python scripts/render_paper.py
 ```
@@ -87,7 +109,7 @@ python scripts/render_paper.py
 ## Tests
 
 ```bash
-python -m pytest -q        # 17 tests: Wilson CI, cliff detection, determinism
+python -m pytest -q        # 22 tests: Wilson CI, cliffs, determinism, deployment gate
 ```
 
 CI (`.github/workflows/ci.yml`) runs the suite on every push to `main`.

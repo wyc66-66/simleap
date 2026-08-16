@@ -265,16 +265,47 @@ perfectly, and the brittle/critical axes collapse cleanly at physically meaningf
 thresholds — friction at the brake limit, rigidity at half the push speed, delay
 at the loop's phase margin, noise at the scale of the goal itself.
 
+### 6.1 A deployment gate, built and audited
+
+The budget table is a map; the question an engineer actually asks is *is this
+digital twin safe to ship a zero-fine-tuning claim on?* That question is a
+decision procedure, so we built one (`src/simleap/gate.py`). The gate turns
+each axis's measured curve into a physical threshold — the boundary of its
+*continuous safe interval*, scanned outward from the reference until the first
+cell below 90% — and approves a proposed twin only if every axis sits on the
+safe side:
+
+| Axis | Safe side (from 84 measured cells) | 50% crossing |
+|---|---|---|
+| `dt` | ≤ 0.14 s | 0.153 s |
+| `mu` | ≥ 0.185 | 0.179 |
+| `k` | ≥ 0.445 | 0.433 |
+| `noise` | ≤ 0.14 m | 0.179 m |
+| `delay` | ≤ 0.20 s | 0.269 s |
+
+Two properties of the thresholds are worth stating. First, they are *stricter
+than the cliff location*: the safe side ends where reliability provably stays
+≥ 90%, which for `dt`/`noise`/`delay` is before the 50% crossing, and for
+`mu`/`k` after it in budget terms. Second, they are computed with a
+continuous-safe-interval rule, which means a *non-contiguous* recovery — the
+delay axis's 92.7% at 0.24 s sits inside a dip that falls back to 82.7% at
+0.26 s — is rejected rather than trusted. A deployment gate may only approve
+configurations whose safety is contiguous on the measured curve.
+
+The gate is validated against every cell it was built from (`gate_audit`):
+replaying all 84 cells, it approves zero cells that measure below 90%
+(false accepts) and its only rejections of ≥ 90% cells are the isolated
+recovery islands that the contiguous rule intentionally refuses. This is the
+cheap pre-deployment check that a high-throughput Real2Sim pipeline like
+GS-Playground [5] — which spins up thousands of parallel environments — would
+run per twin in microseconds, and it is the artifact that turns this report's
+curves into a rule an automated pipeline can enforce.
+
 **Where this table goes next.** The single-axis budget table is a lower bound
 on what a real pipeline faces, and the natural extension is to put it to work
-inside the loop it describes. Two directions are immediate. First, turn the
-table into a **deployment gate**: before a Real2Sim pipeline ships a
-zero-fine-tuning transfer claim, verify that its reconstructed digital twin sits
-on the safe side of the `mu`/`k`/`dt` cliffs — the cheap check that would have
-caught every catastrophic failure in this sweep. That is precisely the
-pre-deployment step a high-throughput simulator like GS-Playground [5] would
-want to run cheaply across its thousands of parallel environments. Second,
-replace the analytic contact model with a full rigid-body engine and a learned
+inside the loop it describes. The first direction — a working deployment gate —
+is built and audited above. The second is open: replace the analytic contact
+model with a full rigid-body engine and a learned
 policy, and measure whether the *locations* of the cliffs move: the quasi-static
 model makes the physics traceable, but a Real2Sim pipeline ships with exactly
 the coupling (visual and physical) that this sweep deliberately removes. The
@@ -282,7 +313,7 @@ question is whether the cliffs are a property of the *task physics* or of the
 *policy class* — and that determines whether this budget table transfers to the
 policies a lab actually deploys.
 
-### 6.1 Limitations
+### 6.2 Limitations
 
 - **No physical hardware was measured.** This is a within-simulator protocol:
   every number reports policy reliability *inside* the simulator as a fidelity
@@ -310,8 +341,12 @@ policies a lab actually deploys.
 - **Policy:** fixed PD position controller with standoff and brake, calibrated
   once (see `src/simleap/policy.py`)
 - **Sweep:** 5 axes × 16–18 grid points = 84 cells × 300 seeds = 25,200 episodes
+- **Deployment gate:** `python -m simleap.gate` builds the per-axis safe-side
+  thresholds (continuous-safe-interval rule) and audits them against all 84
+  cells — 0 false accepts, 1 conservative rejection (the delay recovery island)
 - **Data:** `results/sweep.json`; verify with `python -m simleap.check`, extract
-  claims with `scripts/paper_facts.py`, figures with `scripts/render_figures.py`
+  claims with `scripts/paper_facts.py` / `scripts/gate_facts.py`, figures with
+  `scripts/render_figures.py`
 - **Cost:** pure-Python; the full sweep runs in minutes on a laptop
 
 ## References
