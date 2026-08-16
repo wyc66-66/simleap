@@ -14,6 +14,12 @@ This is the same trade-off every Real2Sim2Real loop faces: simulation is
 always cheaper, faster and safer than reality, but only up to the point where
 the sim stops being a faithful stand-in. We quantify where that point is.
 
+> **Scope.** This is a within-simulator protocol — we measure the policy's
+> reliability boundary *inside* the simulator as fidelity degrades, not
+> transfer to physical hardware. The cliffs are a prediction about what a
+> sim2real pipeline would experience; the numbers themselves are simulator
+> measurements.
+
 ## The five budgets
 
 | Axis | Budget knob | What degrades | Cliff (measured) |
@@ -56,6 +62,9 @@ simleap/
 ## Reproduce
 
 ```bash
+pip install -e .          # installs numpy; tests need pytest
+pip install pytest
+
 # full sweep (84 budget cells × 300 seeds)
 PYTHONPATH=src python scripts/run_sweep.py --seeds 300 --out results/sweep.json
 
@@ -65,6 +74,17 @@ python scripts/paper_facts.py --sweep results/sweep.json
 python scripts/render_figures.py --sweep results/sweep.json
 python scripts/render_paper.py
 ```
+
+> The `PYTHONPATH=src` prefix is bash syntax; on Windows PowerShell use
+> `$env:PYTHONPATH="src"; python scripts/run_sweep.py ...`.
+
+## Tests
+
+```bash
+python -m pytest -q        # 17 tests: Wilson CI, cliff detection, determinism
+```
+
+CI (`.github/workflows/ci.yml`) runs the suite on every push to `main`.
 
 ## Dashboard
 

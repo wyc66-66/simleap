@@ -124,9 +124,10 @@ reference simulator and `b = 0` is the most degraded configuration sampled.
 ![The fidelity cliff](figures/fig1_fidelity_cliff.png)
 
 Every axis starts at 100% reliability and degrades monotonically at the level of
-its Wilson intervals — a handful of grid points carry small non-monotone bumps of
-≤1–3 percentage points, well inside the 300-seed sampling noise (see
-`check.py`). The summary:
+its Wilson intervals — a handful of grid points carry small non-monotone bumps
+of up to ~5 percentage points (the largest is a delay-axis recovery from 87.7%
+to 92.7%), all well inside the 300-seed sampling noise (see `check.py`). The
+summary:
 
 | Axis | Critical budget b\* | Critical value | Safe (≥90%) | Collapse (≤10%) | Width | Dominant failure |
 |---|---|---|---|---|---|---|
@@ -246,6 +247,26 @@ degrade monotonically to within sampling noise, the reference simulator transfer
 perfectly, and the brittle/critical axes collapse cleanly at physically meaningful
 thresholds — friction at the brake limit, rigidity at half the push speed, delay
 at the loop's phase margin, noise at the scale of the goal itself.
+
+### 6.1 Limitations
+
+- **No physical hardware was measured.** This is a within-simulator protocol:
+  every number reports policy reliability *inside* the simulator as a fidelity
+  knob is degraded. We do not claim sim-to-real transfer of the numbers; the
+  cliffs are a prediction about what a Real2Sim2Real pipeline would experience.
+- **One policy class, one task.** The PD push controller and the 2D pushing task
+  are chosen for their analytic tractability (the quasi-static contact model has
+  an explicit closed form). A learned policy (e.g. an RL policy or a diffusion
+  policy) has a different failure surface, and a richer task would couple the
+  knobs in ways this single-axis sweep deliberately does not.
+- **Axes are swept independently.** Real pipelines degrade several fidelities
+  at once (a cheaper sim usually means worse physics *and* worse rendering).
+  The joint surface is outside this paper's scope; the single-axis curves bound
+  it from below.
+- **Deterministic task, sampled noise.** The environment is deterministic apart
+  from the noise knob's per-episode perturbation, so the 300-seed confidence
+  intervals capture policy-level stochasticity, not simulator stochasticity.
+  This is a strength for reproducibility and a limitation for realism.
 
 ## 7. Reproducibility
 
