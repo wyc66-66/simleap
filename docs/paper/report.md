@@ -124,17 +124,20 @@ reference simulator and `b = 0` is the most degraded configuration sampled.
 ![The fidelity cliff](figures/fig1_fidelity_cliff.png)
 
 Every axis starts at 100% reliability and degrades monotonically at the level of
-its Wilson intervals — a handful of grid points carry small non-monotone bumps
-of up to ~5 percentage points (the largest is a delay-axis recovery from 87.7%
-to 92.7%), all well inside the 300-seed sampling noise (see `check.py`). The
-summary:
+its Wilson intervals. A few grid points carry small non-monotone bumps of up to
+~5 percentage points (the largest is a delay-axis recovery from 87.7% to
+92.7%); none survives `check.py`'s strict criterion (Wilson CIs non-overlapping,
+which is what a physical reversal would require), and the nominal z ≈ 2.1 of the
+largest bump does not survive 84 simultaneous comparisons (Bonferroni α ≈
+6×10⁻⁴ per cell). The curves are monotone at the resolution the data support.
+The summary:
 
 | Axis | Critical budget b\* (95% bootstrap CI) | Critical value | Safe (≥90%) | Collapse (≤10%) | Width | Dominant failure |
 |---|---|---|---|---|---|---|
 | Friction `mu` | 0.044 [0.044, 0.044] | 0.179 | b ≥ 0.054 (`mu ≥ 0.185`) | b ≤ 0.038 (`mu ≤ 0.175`) | **0.015** | escape |
 | Contact rigidity `k` | 0.191 [0.190, 0.192] | 0.433 | b ≥ 0.207 (`k ≥ 0.445`) | b ≤ 0.179 (`k ≤ 0.425`) | **0.028** | timeout |
 | Control period `dt` | 0.404 [0.402, 0.406] | 0.153 s | b ≥ 0.458 (`dt ≤ 0.14 s`) | b ≤ 0.375 (`dt ≥ 0.16 s`) | **0.083** | timeout |
-| Observation delay | 0.463 [0.460, 0.465] | 0.269 s | b ≥ 0.520 (`delay ≤ 0.24 s`) | b ≤ 0.420 (`delay ≥ 0.29 s`) | **0.100** | timeout |
+| Observation delay | 0.463 [0.460, 0.465] | 0.269 s | b ≥ 0.520 (`delay ≤ 0.24 s`); the 0.22 s cell dips to 87.7%, so the ≥90% band is not contiguous | b ≤ 0.420 (`delay ≥ 0.29 s`) | **0.100** | timeout |
 | Sensor noise | 0.777 [0.770, 0.782] | 0.179 m | b ≥ 0.825 (`noise ≤ 0.14 m`) | *never* (floor 12–17%) | — | escape → timeout |
 
 The 95% CIs on b\* come from 1,000-draw binomial bootstrap (each cell's
@@ -157,9 +160,10 @@ just to a noisier, worse point.
 
 Observation delay is the opposite. Reliability stays at 100% through
 `delay = 0.20 s`, dips to 88% at 0.22 s, then collapses: 83% at 0.26 s, 45% at
-0.27 s, 26% at 0.28 s, 6% at 0.29 s. (The small recovery at 0.24 s, 93%, is
-within the axis's Wilson-interval noise.) Delay perturbs the *phase* of the
-feedback loop, and phase lag has a hard stability boundary — the classical delay
+0.27 s, 26% at 0.28 s, 6% at 0.29 s. (The small recovery at 0.24 s, 93%, is a
+~2 SE wiggle that does not survive the 84-cell multiple-comparison budget,
+as §3 notes.) Delay perturbs the *phase* of
+the feedback loop, and phase lag has a hard stability boundary — the classical delay
 margin. An amplitude perturbation degrades you continuously; a phase
 perturbation breaks the loop at a threshold.
 
@@ -249,7 +253,9 @@ Three design rules for anyone spending a simulation budget:
    are; the failure mode tells you *which knob* to repair.
 
 The cliff shapes also validate the quasi-static model itself: the five axes
-degrade monotonically to within sampling noise, the reference simulator transfers
+degrade monotonically at the resolution the data support (no reversal survives
+the strict CI-overlap criterion or the 84-cell multiple-comparison budget, §3),
+the reference simulator transfers
 perfectly, and the brittle/critical axes collapse cleanly at physically meaningful
 thresholds — friction at the brake limit, rigidity at half the push speed, delay
 at the loop's phase margin, noise at the scale of the goal itself.

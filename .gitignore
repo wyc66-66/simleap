@@ -8,3 +8,5 @@ dist/
 venv/
 .DS_Store
 *.log
+.hf_cache/
+.huggingface/
