@@ -21,14 +21,14 @@ the sim stops being a faithful stand-in. We quantify where that point is.
 | Control period | `dt` | the policy re-decides less and less often; the actuator's bandwidth shrinks | **critical point** (width 0.08) |
 | Ground friction | `mu` | the block cannot be stopped and coasts through the goal | **critical point** (width 0.02, sharpest) |
 | Contact rigidity | `k` | the push transmits less force; the block crawls and times out | **critical point** (width 0.03) |
-| Sensor noise | `noise` | positional observations become unreliable | **graceful** (width 0.23, floor ≈ 15%) |
+| Sensor noise | `noise` | positional observations become unreliable | **graceful** (no cliff, floor 12–17%) |
 | Observation delay | `delay` | the policy acts on a stale world model | **critical point** (width 0.10) |
 
 Headline result: **four of the five fidelity budgets collapse at a critical
 point; only sensor noise degrades gracefully.** `mu`, `k`, `dt` and `delay`
 each hold reliability at or above 90% until a sharp physical threshold and then
 drop to near-zero within a few percent of budget; `noise` erodes reliability
-continuously over a wide budget range and never fully kills it — a ~15%
+continuously over a wide budget range and never fully kills it — a 12–17%
 residual floor survives even total budget exhaustion. The *shape* of the cliff
 is diagnostic: it separates amplitude perturbations on the observation channel
 (graceful) from phase and dynamics perturbations on the closed loop (critical).

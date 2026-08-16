@@ -5,13 +5,13 @@ goal. The model is deliberately *quasi-static and analytic* so that each
 fidelity knob has a clean, interpretable effect on behaviour:
 
 - ``dt`` — the *control period*: physics advances on a fixed high-resolution
-  substep (1 ms) while the policy re-decides every ``dt`` seconds. The actuator
+  substep (2 ms) while the policy re-decides every ``dt`` seconds. The actuator
   is a critically-damped second-order system whose bandwidth equals the control
   rate (1/dt), so coarse control periods cannot execute high-frequency commands
   and the pusher acts on progressively staler, more sluggish authority;
 - ground friction ``mu`` — how quickly the block stops sliding once released;
   low friction lets it coast through the goal;
-- contact response ``k`` — how fast the block picks up the pusher's push
+- contact rigidity ``k`` — how fast the block picks up the pusher's push
   velocity (1 = rigid, << 1 = soft/soggy contact that cannot transmit force);
 - observation noise ``noise`` — positional noise injected into the policy's
   observations;

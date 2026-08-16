@@ -121,19 +121,32 @@ def fig2_failure_modes(curves, cliffs, out: Path) -> None:
 def fig3_budget_stretch(curves, cliffs, out: Path) -> None:
     order = ["dt", "mu", "k", "noise", "delay"]
     labels = [AXIS_LABELS[a] for a in order]
-    safe = [cliffs[a]["safe_budget"] for a in order]
-    collapse = [cliffs[a]["collapse_budget"] for a in order]
-    widths = [cliffs[a]["cliff_width"] for a in order]
-
     x = np.arange(len(order))
+
     fig, ax = plt.subplots(figsize=(9.0, 4.2))
-    ax.barh(x, collapse, 0.52, color="#aab7c4", label="dead (reliability gone)")
-    ax.barh(x, [s - c for s, c in zip(safe, collapse)], 0.52, left=collapse,
-            color="#b03a2e", alpha=0.85, label="cliff (90% \u2192 10%)")
-    ax.barh(x, [1.0 - s for s in safe], 0.52, left=safe, color="#1e8449",
-            label="safe (\u226590%)")
-    for yi, w in zip(x, widths):
-        ax.text(0.02, yi, f"w={w:.2f}", fontsize=8, va="center", color="white")
+    for yi, a in zip(x, order):
+        cl = cliffs[a]
+        safe, coll = cl["safe_budget"], cl["collapse_budget"]
+        if cl["reaches_collapse"]:
+            ax.barh(yi, coll, 0.52, color="#aab7c4",
+                    label="dead (\u226410%)" if yi == 0 else None)
+            ax.barh(yi, safe - coll, 0.52, left=coll, color="#b03a2e", alpha=0.85,
+                    label="cliff (90% \u2192 10%)" if yi == 0 else None)
+        else:
+            ax.barh(yi, coll, 0.52, color="#e8d9a8", hatch="///", alpha=0.9,
+                    label="floor (never \u226410%)" if yi == 0 else None)
+            ax.barh(yi, safe - coll, 0.52, left=coll, color="#b03a2e", alpha=0.85,
+                    label="cliff (90% \u2192 floor)" if yi == 0 else None)
+        ax.barh(yi, 1.0 - safe, 0.52, left=safe, color="#1e8449",
+                label="safe (\u226590%)" if yi == 0 else None)
+    for yi, a in zip(x, order):
+        cl = cliffs[a]
+        if cl["reaches_collapse"]:
+            ax.text(0.015, yi, f"w={cl['cliff_width']:.2f}", fontsize=8,
+                    va="center", color="white")
+        else:
+            ax.text(0.015, yi, "no collapse", fontsize=7.5, va="center",
+                    color="#7a5c00")
     ax.set_yticks(x)
     ax.set_yticklabels(labels, fontsize=9)
     ax.set_xlim(0, 1.06)
@@ -150,7 +163,7 @@ def fig3_budget_stretch(curves, cliffs, out: Path) -> None:
 def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--sweep", default="results/sweep.json", type=Path)
-    ap.add_argument("--out", default="docs/figures", type=Path)
+    ap.add_argument("--out", default="docs/paper/figures", type=Path)
     args = ap.parse_args()
 
     data = args.sweep

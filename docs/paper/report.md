@@ -7,7 +7,7 @@ degraded simulators
 **Method:** a deterministic 2D pushing task, one policy calibrated at reference
 fidelity, five physical knobs swept one at a time over 84 budget cells × 300 seeds
 **Main result:** four of five fidelity budgets collapse at a critical point; only
-sensor noise degrades gracefully — and the failure mode tells you which knob broke
+sensor noise degrades gracefully — and the failure mode names the likely broken knob
 
 ---
 
@@ -21,25 +21,27 @@ then replay it — unchanged — as five physical knobs are degraded one at a ti
 the control period `dt`, ground friction `mu`, contact rigidity `k`, sensor noise,
 and observation delay.
 
-Three results, each precise enough to be a design rule:
+Three observed trends, each precise enough to guide deployment choices:
 
-1. **The amplitude–phase law.** The two knobs that corrupt the same observation
+1. **Amplitude vs phase.** The two knobs that corrupt the same observation
    channel produce opposite cliff shapes. Sensor noise (an *amplitude*
    perturbation) degrades reliability gracefully over a wide budget range and
-   never fully kills it — a ~15% floor survives total budget exhaustion. Sensor
+   never fully kills it — a ~12–17% floor survives total budget exhaustion. Sensor
    delay (a *phase* perturbation on the feedback loop) collapses reliability at a
    critical point, the way time delay destroys phase margin in classical control.
-2. **The dynamics-knob law.** Control period, friction and contact rigidity are
-   all critical-point failures: reliability holds ≥90% until a sharp physical
-   threshold, then collapses to <10% within a few percent of budget. The fixed-gain
-   policy is only valid inside a narrow neighbourhood of the dynamics it was
-   calibrated on. Friction is the sharpest cliff of all: a 0.01 change in `mu`
-   (0.185 → 0.175) takes reliability from 100% to 0%.
-3. **The mechanism law.** The dominant failure mode identifies the mechanism.
-   *Escape* (the block is lost off-workspace) means a loss of control authority —
-   friction can no longer stop the block. *Timeout* (the push never finishes) means
-   a loss of responsiveness — the actuator, the contact, or the feedback loop is
-   too slow to complete the task in time.
+2. **Dynamics knobs are critical-point failures.** Control period, friction and
+   contact rigidity all hold ≥90% reliability until a physical threshold, then
+   collapse to <10% — but the transition widths differ: `mu` 0.015, `k` 0.028,
+   `dt` 0.083 budget units. Only `mu` and `k` collapse within a few percent of
+   budget; `dt` and `delay` erode through several grid points first. Friction is
+   the sharpest cliff of all: across the 0.01 window `mu` 0.185 → 0.175,
+   reliability goes from 100% to 0%, through an intermediate 70% at `mu = 0.18`.
+3. **Failure modes are diagnostic.** The dominant failure mode identifies the
+   mechanism class. *Escape* (the block is lost off-workspace) means a loss of
+   control authority — friction can no longer stop the block, or the observed
+   goal is offset. *Timeout* (the push never finishes) means a loss of
+   responsiveness — the actuator, the contact, or the feedback loop is too slow
+   to complete the task in time.
 
 ## 1. Motivation
 
@@ -79,9 +81,11 @@ episode must finish within 15 s. Success means the block *enters* the goal and
 *comes to rest* (speed below 0.05 m/s); failure is either a *timeout* (15 s
 elapsed) or an *escape* (the block leaves the ±6 m workspace).
 
-Physics advances on a fixed 2 ms substep. The contact model is deliberately
-quasi-static and analytic so that each fidelity knob has a clean, interpretable
-effect:
+Physics advances on a fixed 2 ms substep. We deliberately use a quasi-static,
+analytic contact model instead of a full rigid-body engine [1, 2, 3]: the
+reduction guarantees that a change in one fidelity knob cannot bleed into the
+others, that every episode is byte-deterministic, and that the *interpretation*
+of each cliff stays unambiguous. Each knob has a clean, interpretable effect:
 
 - **Control period `dt`.** The policy re-decides every `dt` seconds while physics
   steps at 2 ms. The actuator is a critically-damped second-order system whose
@@ -104,8 +108,10 @@ limit 60 m/s²) that aims at a point 0.30 m behind the block, along the directio
 from block to goal, and brakes hard (gain 40) once the block is inside the goal.
 Gains are calibrated *once* at the reference configuration and frozen; every
 degraded run replays the identical controller. Degradation is entirely a property
-of the simulator, never of the policy — this is exactly the sim-to-real transfer
-that the sweep measures.
+of the simulator, never of the policy — but note that this is a *within-simulator*
+transfer protocol. No real-hardware transfer was measured: the sweep replays one
+policy across simulators of decreasing fidelity, which isolates the component a
+Real2Sim2Real loop controls, without claiming the real-robot step was run.
 
 The sweep varies one knob at a time over a grid of 16–18 values spanning the
 reference value down to a fully degraded one (84 cells in total), running 300
@@ -115,21 +121,24 @@ reference simulator and `b = 0` is the most degraded configuration sampled.
 
 ## 4. Results
 
-![The fidelity cliff](../figures/fig1_fidelity_cliff.png)
+![The fidelity cliff](figures/fig1_fidelity_cliff.png)
 
-Every axis starts at 100% reliability and degrades monotonically. The summary:
+Every axis starts at 100% reliability and degrades monotonically at the level of
+its Wilson intervals — a handful of grid points carry small non-monotone bumps of
+≤1–3 percentage points, well inside the 300-seed sampling noise (see
+`check.py`). The summary:
 
 | Axis | Critical budget b\* | Critical value | Safe (≥90%) | Collapse (≤10%) | Width | Dominant failure |
 |---|---|---|---|---|---|---|
 | Friction `mu` | 0.044 | 0.179 | b ≥ 0.054 (`mu ≥ 0.185`) | b ≤ 0.038 (`mu ≤ 0.175`) | **0.015** | escape |
 | Contact rigidity `k` | 0.191 | 0.433 | b ≥ 0.207 (`k ≥ 0.445`) | b ≤ 0.179 (`k ≤ 0.425`) | **0.028** | timeout |
 | Control period `dt` | 0.404 | 0.153 s | b ≥ 0.458 (`dt ≤ 0.14 s`) | b ≤ 0.375 (`dt ≥ 0.16 s`) | **0.083** | timeout |
-| Sensor delay | 0.463 | 0.269 s | b ≥ 0.520 (`delay ≤ 0.24 s`) | b ≤ 0.420 (`delay ≥ 0.29 s`) | **0.100** | timeout |
-| Sensor noise | 0.777 | 0.179 m | b ≥ 0.825 (`noise ≤ 0.14 m`) | *never* (floor ≈ 15%) | **0.225** | escape → timeout |
+| Observation delay | 0.463 | 0.269 s | b ≥ 0.520 (`delay ≤ 0.24 s`) | b ≤ 0.420 (`delay ≥ 0.29 s`) | **0.100** | timeout |
+| Sensor noise | 0.777 | 0.179 m | b ≥ 0.825 (`noise ≤ 0.14 m`) | *never* (floor 12–17%) | — | escape → timeout |
 
-### 4.1 The amplitude–phase law: noise is graceful, delay is critical
+### 4.1 Amplitude vs phase: noise is graceful, delay is critical
 
-![Budget stretch](../figures/fig3_budget_stretch.png)
+![Budget stretch](figures/fig3_budget_stretch.png)
 
 The two knobs on the same observation channel behave completely differently.
 Sensor noise is the *only* graceful axis: reliability erodes continuously from
@@ -139,13 +148,15 @@ that survives even total budget exhaustion. Noise perturbs the *amplitude* of
 the observation; the feedback loop stays stable and the policy still converges,
 just to a noisier, worse point.
 
-Sensor delay is the opposite. Reliability holds at ~100% until `delay ≈ 0.24 s`,
-then collapses: 83% at 0.26 s, 45% at 0.27 s, 26% at 0.28 s, 6% at 0.29 s.
-Delay perturbs the *phase* of the feedback loop, and phase lag has a hard
-stability boundary — the classical delay margin. An amplitude perturbation
-degrades you continuously; a phase perturbation breaks the loop at a threshold.
+Observation delay is the opposite. Reliability stays at 100% through
+`delay = 0.20 s`, dips to 88% at 0.22 s, then collapses: 83% at 0.26 s, 45% at
+0.27 s, 26% at 0.28 s, 6% at 0.29 s. (The small recovery at 0.24 s, 93%, is
+within the axis's Wilson-interval noise.) Delay perturbs the *phase* of the
+feedback loop, and phase lag has a hard stability boundary — the classical delay
+margin. An amplitude perturbation degrades you continuously; a phase
+perturbation breaks the loop at a threshold.
 
-### 4.2 The dynamics-knob law: calibrated policies live in a narrow neighbourhood
+### 4.2 Dynamics knobs: calibrated policies live in a narrow neighbourhood
 
 Friction, contact rigidity and control period all produce the same pattern:
 reliability sits at 100% across a large range, then falls off a cliff in a few
@@ -153,10 +164,11 @@ steps of the grid.
 
 Friction is the sharpest. The block decelerates at `mu·g`, so the braking
 requirement — stop the block inside the 0.18 m goal — sets a threshold. Above
-`mu = 0.185` reliability is 100%; below `mu = 0.175` it is 0%. The entire
-transition happens across `Δmu = 0.01`. The dominant failure at the cliff is
-*escape*: the block coasts through the goal, never stops, and slides off the
-workspace. This is a pure loss of control authority.
+`mu = 0.185` reliability is 100%; at `mu = 0.18` it has already dropped to 70%;
+below `mu = 0.175` it is 0%. The bulk of the transition happens across
+`Δmu = 0.01`. The dominant failure at the cliff is *escape*: the block coasts
+through the goal, never stops, and slides off the workspace. This is a pure loss
+of control authority.
 
 Contact rigidity collapses at `k ≈ 0.43`: below it, the block moves at less than
 half the push speed, the push crawls, and every episode ends in timeout. The
@@ -164,17 +176,20 @@ control-period cliff sits at `dt ≈ 0.15 s` — an actuator bandwidth of ~6.5 H
 below which the critically-damped actuator cannot track the PD commands fast
 enough to finish the push; failures are again timeout.
 
-![Failure modes](../figures/fig2_failure_modes.png)
+![Failure modes](figures/fig2_failure_modes.png)
 
-### 4.3 The mechanism law: failure modes name the broken knob
+### 4.3 Failure modes: naming the likely broken knob
 
 The failure-mode decomposition (success / timeout / escape at every grid point)
 makes the mechanism legible. Escape is caused by friction and, at the noise cliff,
 by the observed goal being offset — the policy pushes the block past the goal.
 Timeout is caused by `dt`, `k` and `delay` — the push is too slow to finish, the
 contact transmits too little force, or the loop acts on a state too old to brake
-in time. Given a simulator that reports low reliability, the failure mode alone
-narrows the fault to one knob.
+in time. Given a simulator that reports low reliability, the failure mode narrows
+the fault to a class of knob: *escape* rules out the control/contact/latency
+class and points to friction or a mis-calibrated goal observation; *timeout*
+points to the control loop. The mode is diagnostic within these classes — it
+does not fingerprint a single knob.
 
 ## 5. Related Work
 
@@ -227,10 +242,10 @@ Three design rules for anyone spending a simulation budget:
    are; the failure mode tells you *which knob* to repair.
 
 The cliff shapes also validate the quasi-static model itself: the five axes
-degrade monotonically, the reference simulator transfers perfectly, and the
-brittle/critical axes collapse cleanly at physically meaningful thresholds —
-friction at the brake limit, rigidity at half the push speed, delay at the loop's
-phase margin, noise at the scale of the goal itself.
+degrade monotonically to within sampling noise, the reference simulator transfers
+perfectly, and the brittle/critical axes collapse cleanly at physically meaningful
+thresholds — friction at the brake limit, rigidity at half the push speed, delay
+at the loop's phase margin, noise at the scale of the goal itself.
 
 ## 7. Reproducibility
 
