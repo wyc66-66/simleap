@@ -21,7 +21,9 @@ then replay it — unchanged — as five physical knobs are degraded one at a ti
 the control period `dt`, ground friction `mu`, contact rigidity `k`, sensor noise,
 and observation delay.
 
-Three observed trends, each precise enough to guide deployment choices:
+Across 25,200 replayed episodes the picture is not a smooth degradation ladder.
+Four knobs are critical-point failures; one degrades gracefully. Three
+observations, each actionable in its own way:
 
 1. **Amplitude vs phase.** The two knobs that corrupt the same observation
    channel produce opposite cliff shapes. Sensor noise (an *amplitude*
@@ -123,13 +125,14 @@ reference simulator and `b = 0` is the most degraded configuration sampled.
 
 ![The fidelity cliff](figures/fig1_fidelity_cliff.png)
 
-Every axis starts at 100% reliability and degrades monotonically at the level of
-its Wilson intervals. A few grid points carry small non-monotone bumps of up to
-~5 percentage points (the largest is a delay-axis recovery from 87.7% to
-92.7%); none survives `check.py`'s strict criterion (Wilson CIs non-overlapping,
-which is what a physical reversal would require), and the nominal z ≈ 2.1 of the
-largest bump does not survive 84 simultaneous comparisons (Bonferroni α ≈
-6×10⁻⁴ per cell). The curves are monotone at the resolution the data support.
+Our first instinct on seeing the raw curves was to declare the axes monotone and
+move on. Then we hit the delay-axis bump — a recovery from 87.7% to 92.7%
+between two neighbouring cells — and stopped assuming. A physical reversal is a
+strong claim, so we set a strict bar for one: the Wilson confidence intervals of
+the two cells must not overlap. Nothing in the sweep met that bar, and the
+largest bump's nominal z ≈ 2.1 evaporates against 84 simultaneous comparisons
+(Bonferroni α ≈ 6×10⁻⁴ per cell). The curves are monotone at the resolution the
+data support — which is not the same as monotone everywhere.
 The summary:
 
 | Axis | Critical budget b\* (95% bootstrap CI) | Critical value | Safe (≥90%) | Collapse (≤10%) | Width | Dominant failure |
@@ -162,7 +165,7 @@ Observation delay is the opposite. Reliability stays at 100% through
 `delay = 0.20 s`, dips to 88% at 0.22 s, then collapses: 83% at 0.26 s, 45% at
 0.27 s, 26% at 0.28 s, 6% at 0.29 s. (The small recovery at 0.24 s, 93%, is a
 ~2 SE wiggle that does not survive the 84-cell multiple-comparison budget,
-as §3 notes.) Delay perturbs the *phase* of
+as §4 notes.) Delay perturbs the *phase* of
 the feedback loop, and phase lag has a hard stability boundary — the classical delay
 margin. An amplitude perturbation degrades you continuously; a phase
 perturbation breaks the loop at a threshold.
@@ -236,7 +239,9 @@ outcome directly, which is the metric that determines deployment decisions.
 
 ## 6. Discussion
 
-Three design rules for anyone spending a simulation budget:
+The budget table is the deliverable; the design rules it implies are short. A
+simulator's fidelity is not a single dial — it is five, and they do not cost
+the same to turn back up:
 
 1. **Treat noise as the free budget.** You can discard ~18% of the noise budget
    before reliability drops below 90%, and even total noise only costs you to a
@@ -254,11 +259,28 @@ Three design rules for anyone spending a simulation budget:
 
 The cliff shapes also validate the quasi-static model itself: the five axes
 degrade monotonically at the resolution the data support (no reversal survives
-the strict CI-overlap criterion or the 84-cell multiple-comparison budget, §3),
+the strict CI-overlap criterion or the 84-cell multiple-comparison budget, §4),
 the reference simulator transfers
 perfectly, and the brittle/critical axes collapse cleanly at physically meaningful
 thresholds — friction at the brake limit, rigidity at half the push speed, delay
 at the loop's phase margin, noise at the scale of the goal itself.
+
+**Where this table goes next.** The single-axis budget table is a lower bound
+on what a real pipeline faces, and the natural extension is to put it to work
+inside the loop it describes. Two directions are immediate. First, turn the
+table into a **deployment gate**: before a Real2Sim pipeline ships a
+zero-fine-tuning transfer claim, verify that its reconstructed digital twin sits
+on the safe side of the `mu`/`k`/`dt` cliffs — the cheap check that would have
+caught every catastrophic failure in this sweep. That is precisely the
+pre-deployment step a high-throughput simulator like GS-Playground [5] would
+want to run cheaply across its thousands of parallel environments. Second,
+replace the analytic contact model with a full rigid-body engine and a learned
+policy, and measure whether the *locations* of the cliffs move: the quasi-static
+model makes the physics traceable, but a Real2Sim pipeline ships with exactly
+the coupling (visual and physical) that this sweep deliberately removes. The
+question is whether the cliffs are a property of the *task physics* or of the
+*policy class* — and that determines whether this budget table transfers to the
+policies a lab actually deploys.
 
 ### 6.1 Limitations
 

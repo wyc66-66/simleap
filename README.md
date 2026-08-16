@@ -25,6 +25,10 @@ a diagnosable failure mode.
 > sim2real pipeline would experience; the numbers themselves are simulator
 > measurements.
 
+**Scale:** 5 fidelity axes × 16–18 grid points = 84 budget cells × 300
+deterministic seeds each = **25,200 episodes**, all in pure Python (minutes on a
+laptop). Every cliff carries a 95% bootstrap confidence interval.
+
 ## The five budgets
 
 | Axis | Budget knob | What degrades | Cliff (measured) |
