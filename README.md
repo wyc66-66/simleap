@@ -144,3 +144,15 @@ scripts alone — no manual curation of results.
 ## Live report
 
 The technical report, figures and every number are served at **[https://wyc66-66.github.io/simleap/](https://wyc66-66.github.io/simleap/)**.
+
+## SimLeapX (GS-Playground / MotriX port)
+
+The same fidelity protocol, ported to GS-Playground's MotriX engine and compared
+cliff-for-cliff against MuJoCo — see `simleapx/` in this repo.
+
+- **Live report:** [https://wyc66-66.github.io/simleap/simleapx-report.html](https://wyc66-66.github.io/simleap/simleapx-report.html)
+- Headline finding: the contact-rigidity cliff **vanishes** on MotriX
+  (100% down to k = 0.005, verified by a force-transmission probe), the friction
+  cliff shifts (MotriX fails first), and `dt`/`delay` agree across engines.
+- 12,800 episodes, N = 200 Wilson 95% CI per cell, failure-mode classification,
+  full pytest suite (`simleapx/tests/test_protocol.py`).
