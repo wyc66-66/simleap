@@ -1,0 +1,96 @@
+{
+  "N": 200,
+  "edge_radius": 0.6,
+  "cells": {
+    "mu_f0.18": {
+      "ok": 200,
+      "class": {
+        "edge-fail": 0,
+        "in-goal-fail": 0,
+        "stalled": 0,
+        "runaway": 0
+      },
+      "median_dist": NaN
+    },
+    "mu_f0.15": {
+      "ok": 1,
+      "class": {
+        "edge-fail": 199,
+        "in-goal-fail": 0,
+        "stalled": 0,
+        "runaway": 0
+      },
+      "median_dist": 0.19988527883485768
+    },
+    "dt_0.030": {
+      "ok": 200,
+      "class": {
+        "edge-fail": 0,
+        "in-goal-fail": 0,
+        "stalled": 0,
+        "runaway": 0
+      },
+      "median_dist": NaN
+    },
+    "dt_0.035": {
+      "ok": 0,
+      "class": {
+        "edge-fail": 200,
+        "in-goal-fail": 0,
+        "stalled": 0,
+        "runaway": 0
+      },
+      "median_dist": 0.22134372037385516
+    },
+    "k_0.005": {
+      "ok": 200,
+      "class": {
+        "edge-fail": 0,
+        "in-goal-fail": 0,
+        "stalled": 0,
+        "runaway": 0
+      },
+      "median_dist": NaN
+    },
+    "noise_0.30": {
+      "ok": 102,
+      "class": {
+        "edge-fail": 91,
+        "in-goal-fail": 0,
+        "stalled": 7,
+        "runaway": 0
+      },
+      "median_dist": 0.3313633014545435
+    },
+    "noise_0.60": {
+      "ok": 30,
+      "class": {
+        "edge-fail": 87,
+        "in-goal-fail": 0,
+        "stalled": 83,
+        "runaway": 0
+      },
+      "median_dist": 0.5843495274367392
+    },
+    "delay_0.25": {
+      "ok": 200,
+      "class": {
+        "edge-fail": 0,
+        "in-goal-fail": 0,
+        "stalled": 0,
+        "runaway": 0
+      },
+      "median_dist": NaN
+    },
+    "delay_0.30": {
+      "ok": 0,
+      "class": {
+        "edge-fail": 200,
+        "in-goal-fail": 0,
+        "stalled": 0,
+        "runaway": 0
+      },
+      "median_dist": 0.1952514782637037
+    }
+  }
+}
